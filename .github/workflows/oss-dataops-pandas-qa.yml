@@ -1,0 +1,50 @@
+name: OSS DataOps Pandas Comparison QA
+
+on:
+  push:
+    branches:
+      - qa/dataops-pandas-comparison-2005
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  comparison-doc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install skrub for documentation examples
+        run: python -m pip install -e .
+      - name: Run complete RST doctests
+        run: |
+          python - <<'PY'
+          import doctest
+          from pathlib import Path
+
+          path = Path("skrub/_docs/modules/data_ops/basics/data_ops_vs_alternatives.rst")
+          failures, attempted = doctest.testfile(str(path), module_relative=False, encoding="utf-8")
+          assert attempted == 14, f"Expected 14 doctest prompts; observed {attempted}"
+          assert failures == 0, f"{failures} doctest failures"
+          print(f"Passed all {attempted} pandas / DataOps comparison doctests.")
+          PY
+      - name: Check documentation scope
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("skrub/_docs/modules/data_ops/basics/data_ops_vs_alternatives.rst").read_text(encoding="utf-8")
+          for phrase in (
+              "A two-table calculation with pandas and DataOps",
+              "totals_pandas(orders, prices).tolist()",
+              "totals.skb.eval(",
+              "learner.fit_transform(",
+              "not estimator fitting or leakage-safe validation",
+          ):
+              assert phrase in source, f"Missing guide content: {phrase}"
+          print("Scope and caveats are present.")
+          PY
